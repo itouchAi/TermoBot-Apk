@@ -1,4 +1,4 @@
-name: Build Pure Flutter APK
+name: Build Real TermoBot APK
 
 on:
   push:
@@ -6,41 +6,64 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-flutter-apk:
-    name: Build Pure Flutter APK (120 FPS Native)
+  build-apk:
+    name: Build Real TermoBot APK (1:1 Original UI)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Web Assets (Full 3D & All Features)
+        run: npm run build
+
+      - name: Sync Capacitor Android Platform
+        run: npx cap sync android
+
       - name: Set up Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
-      - name: Set up Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.29.0'
-          channel: 'stable'
-          cache: true
-
-      - name: Prepare Clean Android Platform (AGP 8+ Compatible)
+      - name: Configure Android SDK and Environment
         run: |
-          cd flutter_termobot
-          rm -rf android
-          flutter create . --platforms=android --org com.termobot
-          flutter pub get
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          cat << 'EOF' > android/variables.gradle
+          ext {
+              minSdkVersion = 24
+              compileSdkVersion = 35
+              targetSdkVersion = 34
+              androidxActivityVersion = '1.9.0'
+              androidxAppCompatVersion = '1.7.0'
+              androidxCoordinatorLayoutVersion = '1.2.0'
+              androidxCoreVersion = '1.13.1'
+              androidxFragmentVersion = '1.8.0'
+              coreSplashScreenVersion = '1.0.1'
+              androidxWebkitVersion = '1.12.0'
+              junitVersion = '4.13.2'
+              androidxJunitVersion = '1.2.1'
+              androidxEspressoCoreVersion = '3.6.1'
+              cordovaAndroidVersion = '10.1.1'
+          }
+          EOF
 
-      - name: Build Release APK
+      - name: Build Native Android APK
         run: |
-          cd flutter_termobot
-          flutter build apk --release
+          cd android
+          chmod +x gradlew
+          ./gradlew clean assembleDebug --no-daemon --stacktrace
 
-      - name: Upload Flutter Release APK Artifact
+      - name: Upload Real App APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TermoBot-Pure-Flutter-Release-APK
-          path: flutter_termobot/build/app/outputs/flutter-apk/app-release.apk
+          name: TermoBot-Original-Real-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
