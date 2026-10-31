@@ -26,12 +26,10 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Verify Flutter Installation
-        run: flutter doctor -v
-
-      - name: Install Flutter Dependencies
+      - name: Prepare Android Platform Files (v2 Embedding)
         run: |
           cd flutter_termobot
+          flutter create . --platforms=android --org com.termobot
           flutter pub get
 
       - name: Build Release APK
