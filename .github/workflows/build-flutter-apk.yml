@@ -26,9 +26,10 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Prepare Android Platform Files (v2 Embedding)
+      - name: Prepare Clean Android Platform (AGP 8+ Compatible)
         run: |
           cd flutter_termobot
+          rm -rf android
           flutter create . --platforms=android --org com.termobot
           flutter pub get
 
