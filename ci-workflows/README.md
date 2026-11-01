@@ -1,10 +1,50 @@
-# GitHub Actions CI/CD İş Akışları (APK & iOS)
+# 🚀 Otomatik APK ve iOS Derleme Talimatı
 
-Bu klasördeki dosyalar:
-- `build-flutter-apk.yml`: Saf 120 FPS Flutter APK derleyicisi
-- `build-flutter-ios.yml`: Saf Flutter iOS derleyicisi
-- `build-apk.yml`: Capacitor Android APK derleyicisi
-- `build-ios.yml`: Capacitor iOS derleyicisi
+```yaml
+name: Build Pure Flutter APK
 
-## Nasıl Aktif Edilir?
-Projenizi GitHub'a yükledikten sonra, GitHub web arayüzünde bu dosyaları `.github/workflows/` klasörü altına taşıyabilir veya GitHub ayarlarınızdan AI Studio'ya `Workflows` izni vererek doğrudan çalıştırabilirsiniz.
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-flutter-apk:
+    name: Build Pure Flutter APK (120 FPS Native)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Prepare Clean Android Platform (AGP 8+ Compatible)
+        run: |
+          cd flutter_termobot
+          rm -rf android
+          flutter create . --platforms=android --org com.termobot
+          flutter pub get
+
+      - name: Build Release APK
+        run: |
+          cd flutter_termobot
+          flutter build apk --release
+
+      - name: Upload Flutter Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TermoBot-Pure-Flutter-Release-APK
+          path: flutter_termobot/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+```

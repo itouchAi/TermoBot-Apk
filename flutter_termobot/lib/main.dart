@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme/app_theme.dart';
 import 'models/thermostat_state.dart';
+import 'models/app_settings.dart';
 import 'services/esp_service.dart';
 import 'screens/thermostat_screen.dart';
 import 'screens/weather_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/schedule_screen.dart';
+import 'widgets/settings_sheet.dart';
+import 'widgets/voice_call_overlay.dart';
+import 'widgets/smart_display_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,28 +18,49 @@ void main() {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Color(0xFF090D16),
+    systemNavigationBarColor: Color(0xFF090D14),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
   runApp(const TermoBotApp());
 }
 
-class TermoBotApp extends StatelessWidget {
+class TermoBotApp extends StatefulWidget {
   const TermoBotApp({super.key});
+
+  @override
+  State<TermoBotApp> createState() => _TermoBotAppState();
+}
+
+class _TermoBotAppState extends State<TermoBotApp> {
+  AppSettings _settings = AppSettings();
+
+  void _updateSettings(AppSettings newSettings) {
+    setState(() => _settings = newSettings);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TermoBot',
+      title: 'TermoBot 3D',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const MainNavigationScreen(),
+      home: MainNavigationScreen(
+        settings: _settings,
+        onUpdateSettings: _updateSettings,
+      ),
     );
   }
 }
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  final AppSettings settings;
+  final ValueChanged<AppSettings> onUpdateSettings;
+
+  const MainNavigationScreen({
+    super.key,
+    required this.settings,
+    required this.onUpdateSettings,
+  });
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -45,6 +70,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   ThermostatState _state = ThermostatState();
   final EspService _espService = EspService();
+
+  // Full-screen overlays
+  bool _isCallOverlayOpen = false;
+  String _callReason = 'manual_test';
+  bool _isSmartDisplayOpen = false;
+
+  // Active Alert Banner
+  String? _alertMessage;
+  bool _isAlertError = false;
 
   void _onTargetChanged(double newTarget) {
     setState(() {
@@ -60,21 +94,91 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   void _onToggleRelay() {
     setState(() {
+      final next = !_state.isRelayActive;
       _state = _state.copyWith(
-        isRelayActive: !_state.isRelayActive,
-        flameModulation: !_state.isRelayActive ? 65 : 0,
+        isRelayActive: next,
+        flameModulation: next ? 68 : 0,
       );
+      if (next && widget.settings.voiceCallEnabled && widget.settings.autoCallOnIgnition) {
+        _triggerCall('ignition');
+      }
     });
+  }
+
+  void _triggerCall(String reason) {
+    HapticFeedback.heavyImpact();
+    setState(() {
+      _callReason = reason;
+      _isCallOverlayOpen = true;
+    });
+  }
+
+  void _showSettingsModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SettingsSheet(
+        settings: widget.settings,
+        onUpdateSettings: widget.onUpdateSettings,
+        onLaunchSmartDisplay: () => setState(() => _isSmartDisplayOpen = true),
+        onTriggerTestCall: () => _triggerCall('manual_test'),
+        onTriggerDisconnectAlert: () {
+          HapticFeedback.heavyImpact();
+          setState(() {
+            _state = _state.copyWith(isConnected: false);
+            _alertMessage = '⚠️ Kombi ESP32 bağlantısı koptu! Isıtma emniyet moduna geçti.';
+            _isAlertError = true;
+          });
+        },
+        onTriggerLowBatteryAlert: () {
+          HapticFeedback.mediumImpact();
+          setState(() {
+            _alertMessage = '🪫 Düşük Pil: Oda termostatı pili %14 seviyesine düştü!';
+            _isAlertError = false;
+          });
+        },
+        onResetFactorySettings: () {
+          setState(() {
+            _state = ThermostatState();
+            widget.onUpdateSettings(AppSettings());
+            _alertMessage = '✓ Fabrika ayarlarına başarıyla sıfırlandı.';
+            _isAlertError = false;
+          });
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isCallOverlayOpen) {
+      return VoiceCallOverlay(
+        callReason: _callReason,
+        currentTemp: _state.currentTemp,
+        targetTemp: _state.targetTemp,
+        onDismiss: () => setState(() => _isCallOverlayOpen = false),
+      );
+    }
+
+    if (_isSmartDisplayOpen) {
+      return SmartDisplayView(
+        currentTemp: _state.currentTemp,
+        targetTemp: _state.targetTemp,
+        isHeating: _state.isRelayActive,
+        onDismiss: () => setState(() => _isSmartDisplayOpen = false),
+      );
+    }
+
     final screens = [
       ThermostatScreen(
         state: _state,
+        settings: widget.settings,
         onTargetChanged: _onTargetChanged,
         onSetPreset: _onSetPreset,
         onToggleRelay: _onToggleRelay,
+        onOpenSettings: _showSettingsModal,
+        onLaunchSmartDisplay: () => setState(() => _isSmartDisplayOpen = true),
       ),
       const WeatherScreen(),
       const ReportsScreen(),
@@ -92,18 +196,69 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       appBar: AppBar(
         title: Text(titles[_currentIndex]),
         actions: [
+          // Ambiyans Modu Butonu
           IconButton(
-            icon: const Icon(Icons.tune_rounded, color: AppTheme.textSecondary),
+            icon: const Icon(Icons.tv_rounded, color: Colors.white70),
             onPressed: () {
               HapticFeedback.lightImpact();
-              _showSettingsModal(context);
+              setState(() => _isSmartDisplayOpen = true);
             },
           ),
+          // Ayarlar Çarkı
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: Colors.white),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _showSettingsModal();
+            },
+          ),
+          const SizedBox(width: 4),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _currentIndex,
+            children: screens,
+          ),
+
+          // Üst Kayan Sistem Uyarı Banner'ı
+          if (_alertMessage != null)
+            Positioned(
+              top: 10,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _isAlertError ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isAlertError ? Icons.wifi_off_rounded : Icons.battery_alert_rounded,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _alertMessage!,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                      onPressed: () => setState(() => _alertMessage = null),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -129,67 +284,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             label: 'Program',
           ),
         ],
-      ),
-    );
-  }
-
-  void _showSettingsModal(BuildContext context) {
-    final ipController = TextEditingController(text: _state.espIp);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'ESP32 & Donanım Ayarları',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: ipController,
-              decoration: InputDecoration(
-                labelText: 'ESP32 Yerel IP Adresi',
-                labelStyle: const TextStyle(color: AppTheme.textSecondary),
-                filled: true,
-                fillColor: AppTheme.surfaceElevated,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppTheme.border),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.flameOrange,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: () {
-                setState(() {
-                  _state = _state.copyWith(espIp: ipController.text.trim());
-                });
-                Navigator.pop(ctx);
-              },
-              child: const Text(
-                'Kaydet ve Bağlan',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
