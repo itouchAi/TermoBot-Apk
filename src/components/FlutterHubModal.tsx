@@ -63,14 +63,12 @@ const FLUTTER_FILES: FlutterFileStat[] = [
   { name: 'mascot_widget.dart', path: 'lib/widgets/mascot_widget.dart', lines: 130, category: 'Widgets', description: 'Mini zıplayan maskot bileşeni', tags: ['Mini Mascot'] },
 
   // Services
-  { name: 'audio_synthesizer_web.dart', path: 'lib/services/audio_synthesizer_web.dart', lines: 223, category: 'Services', description: 'Web Audio API AudioContext osilatörleri ile sıfır gecikmeli ses motoru', tags: ['Web Audio API', 'Oscillators'] },
   { name: 'history_storage_service.dart', path: 'lib/services/history_storage_service.dart', lines: 180, category: 'Services', description: 'SharedPreferences kalıcı geçmiş veri tabanı ve birim fiyat saklama', tags: ['Persistence', 'Hourly DB'] },
-  { name: 'sound_synthesis_service.dart', path: 'lib/services/sound_synthesis_service.dart', lines: 120, category: 'Services', description: 'Kadran kliki, röle thud vuruşu, maskot sesleri ve ikaz sirenleri', tags: ['Synthesizer', 'Dial Tick', 'Relay Sound'] },
+  { name: 'sound_synthesis_service.dart', path: 'lib/services/sound_synthesis_service.dart', lines: 115, category: 'Services', description: 'Saf Flutter SystemSound mekanik kadran kliki, röle thud vuruşu ve ikaz sesleri', tags: ['SystemSound', 'Dial Tick', 'Native'] },
   { name: 'weather_service.dart', path: 'lib/services/weather_service.dart', lines: 112, category: 'Services', description: 'Open-Meteo API veri çekme ve fallback meteoroloji modeli', tags: ['Open-Meteo', 'Weather API'] },
   { name: 'telegram_bot_service.dart', path: 'lib/services/telegram_bot_service.dart', lines: 102, category: 'Services', description: 'Canlı Telegram Bot API webhook köprüsü, acil durum uyarı iletimi', tags: ['Telegram API', 'Webhook', 'Alerts'] },
   { name: 'esp_service.dart', path: 'lib/services/esp_service.dart', lines: 71, category: 'Services', description: 'ESP32 Wi-Fi HTTP röle anahtarlama ve termostat kural motoru', tags: ['ESP32 HTTP', 'Thermostat Rules'] },
   { name: 'haptics_service.dart', path: 'lib/services/haptics_service.dart', lines: 67, category: 'Services', description: '6 seviyeli dokunsal titreşim geri bildirim yöneticisi', tags: ['Haptics', 'Vibration'] },
-  { name: 'audio_synthesizer_stub.dart', path: 'lib/services/audio_synthesizer_stub.dart', lines: 4, category: 'Services', description: 'Native platform ses motoru soyutlama stubu', tags: ['Stub'] },
 
   // Models & Utils
   { name: 'main.dart', path: 'lib/main.dart', lines: 351, category: 'Models & Utils', description: 'Uygulama giriş noktası, otonom döngüler ve tam ekran overlay yöneticisi', tags: ['Main Entry', 'Orchestrator'] },
