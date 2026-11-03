@@ -22,6 +22,7 @@ import {
   WifiOff,
   BatteryWarning,
   BatteryMedium,
+  Cpu,
 } from 'lucide-react';
 
 import { playWarningAlertSound, sendSystemNotification } from './utils/callRingtone.ts';
@@ -60,6 +61,7 @@ import { MascotScreenSaverOverlay } from './components/Mascot/MascotScreenSaverO
 import type { VoiceCallConfig } from './types/voiceCall.ts';
 import { DEFAULT_VOICE_CALL_CONFIG } from './types/voiceCall.ts';
 import { AndroidCallOverlay } from './components/VoiceCall/AndroidCallOverlay.tsx';
+import { FlutterHubModal } from './components/FlutterHubModal.tsx';
 
 
 import {
@@ -339,6 +341,7 @@ export default function App() {
   });
 
   const [isSplashPreview, setIsSplashPreview] = useState<boolean>(false);
+  const [isFlutterHubOpen, setIsFlutterHubOpen] = useState<boolean>(false);
 
   const handleSplashComplete = useCallback(() => {
     setShowStartupSplash(false);
@@ -1498,6 +1501,20 @@ export default function App() {
           >
             <span className="text-sm leading-none drop-shadow-xs">{lang === 'tr' ? '🇹🇷' : '🇬🇧'}</span>
             <span className="text-[11px] font-black tracking-tight">{lang === 'tr' ? 'TR' : 'EN'}</span>
+          </button>
+
+          {/* ⚡ Flutter & Dart 1:1 Architecture Hub Modal Trigger */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setIsFlutterHubOpen(true);
+            }}
+            className="h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl border flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer bg-gradient-to-r from-cyan-600/25 to-blue-600/25 hover:from-cyan-600/40 hover:to-blue-600/40 border-cyan-400/40 text-cyan-300 shadow-[0_3px_8px_rgba(0,0,0,0.5)]"
+            title="Flutter & Dart 1:1 Mimari Merkezi (14.344 Satır Kod / 44 Dosya / 18 Madde)"
+          >
+            <Cpu className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span className="text-[11px] font-black tracking-tight">Flutter 14.3k</span>
           </button>
 
           {/* 1. Performance Mode Switch (Ultra 60FPS Canavar Modu vs Eco Sıfır Kasma) */}
@@ -2708,6 +2725,12 @@ export default function App() {
           isPreview={isSplashPreview}
         />
       )}
+
+      {/* ── FLUTTER & DART 1:1 NATIVE CODEBASE ARCHITECTURE HUB MODAL ── */}
+      <FlutterHubModal
+        isOpen={isFlutterHubOpen}
+        onClose={() => setIsFlutterHubOpen(false)}
+      />
     </div>
   );
 }

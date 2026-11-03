@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/sound_synthesis_service.dart';
 
 class TactileDialWidget extends StatefulWidget {
   final double currentTemp;
@@ -44,14 +45,14 @@ class _TactileDialWidgetState extends State<TactileDialWidget> {
       double steppedTemp = (rawTemp * 2).round() / 2.0;
 
       if (steppedTemp != widget.targetTemp && steppedTemp >= minTemp && steppedTemp <= maxTemp) {
-        HapticFeedback.selectionClick();
+        SoundSynthesisService.playDialTick();
         widget.onTargetChanged(steppedTemp);
       }
     }
   }
 
   void _adjustDelta(double delta) {
-    HapticFeedback.selectionClick();
+    SoundSynthesisService.playDialTick();
     final next = (widget.targetTemp + delta).clamp(minTemp, maxTemp);
     final rounded = (next * 2).round() / 2.0;
     widget.onTargetChanged(rounded);

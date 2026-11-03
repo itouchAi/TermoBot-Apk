@@ -4,21 +4,31 @@ import 'theme/app_theme.dart';
 import 'models/thermostat_state.dart';
 import 'models/app_settings.dart';
 import 'services/esp_service.dart';
-import 'screens/thermostat_screen.dart';
-import 'screens/weather_screen.dart';
-import 'screens/reports_screen.dart';
-import 'screens/schedule_screen.dart';
+import 'services/sound_synthesis_service.dart';
+import 'services/haptics_service.dart';
+import 'screens/tactile_deck_screen.dart';
 import 'widgets/settings_sheet.dart';
+import 'widgets/widget_customizer_modal.dart';
+import 'widgets/theme_selector_modal.dart';
+import 'widgets/voice_assistant_modal.dart';
+import 'widgets/startup_boot_splash.dart';
 import 'widgets/voice_call_overlay.dart';
 import 'widgets/smart_display_view.dart';
+import 'widgets/mascot_screen_saver_overlay.dart';
+import 'widgets/universal_mascot.dart';
+import 'utils/i18n.dart';
+import 'services/telegram_bot_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await I18n.init();
+  await HapticsService.init();
+  await SoundSynthesisService.init();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Color(0xFF090D14),
+    systemNavigationBarColor: Color(0xFF0F0E15),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
   runApp(const TermoBotApp());
@@ -41,7 +51,7 @@ class _TermoBotAppState extends State<TermoBotApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TermoBot 3D',
+      title: 'TermoBot',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: MainNavigationScreen(
@@ -67,14 +77,25 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
   ThermostatState _state = ThermostatState();
   final EspService _espService = EspService();
+
+  // Boot status
+  bool _isBooted = false;
+
+  // Theme & Performance
+  String _currentTheme = 'tactile_deck';
+  int _paletteIdx = 3;
+  bool _isUltraPerformance = true;
+
+  // Screen ordering
+  List<String> _tabOrder = ['genel', 'hava', 'rapor', 'program'];
 
   // Full-screen overlays
   bool _isCallOverlayOpen = false;
   String _callReason = 'manual_test';
   bool _isSmartDisplayOpen = false;
+  bool _isScreenSaverOpen = false;
 
   // Active Alert Banner
   String? _alertMessage;
@@ -95,12 +116,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void _onToggleRelay() {
     setState(() {
       final next = !_state.isRelayActive;
+      SoundSynthesisService.playRelayClick(isEngaged: next);
       _state = _state.copyWith(
         isRelayActive: next,
         flameModulation: next ? 68 : 0,
       );
       if (next && widget.settings.voiceCallEnabled && widget.settings.autoCallOnIgnition) {
         _triggerCall('ignition');
+      }
+      if (next && widget.settings.telegramAlertsEnabled && widget.settings.telegramToken.isNotEmpty) {
+        TelegramBotService.sendBoilerAlert(
+          botToken: widget.settings.telegramToken,
+          chatId: widget.settings.telegramChatId,
+          eventType: 'ignition',
+          currentTemp: _state.currentTemp,
+          targetTemp: _state.targetTemp,
+          isHeating: true,
+        );
       }
     });
   }
@@ -122,9 +154,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         settings: widget.settings,
         onUpdateSettings: widget.onUpdateSettings,
         onLaunchSmartDisplay: () => setState(() => _isSmartDisplayOpen = true),
+        onLaunchScreenSaver: () => setState(() => _isScreenSaverOpen = true),
         onTriggerTestCall: () => _triggerCall('manual_test'),
         onTriggerDisconnectAlert: () {
-          HapticFeedback.heavyImpact();
+          SoundSynthesisService.playWarningAlert(WarningSoundType.connection);
           setState(() {
             _state = _state.copyWith(isConnected: false);
             _alertMessage = '⚠️ Kombi ESP32 bağlantısı koptu! Isıtma emniyet moduna geçti.';
@@ -132,7 +165,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           });
         },
         onTriggerLowBatteryAlert: () {
-          HapticFeedback.mediumImpact();
+          SoundSynthesisService.playWarningAlert(WarningSoundType.battery);
           setState(() {
             _alertMessage = '🪫 Düşük Pil: Oda termostatı pili %14 seviyesine düştü!';
             _isAlertError = false;
@@ -150,8 +183,60 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
+  void _showCustomizerModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => WidgetCustomizerModal(
+        tabOrder: _tabOrder,
+        onUpdateTabOrder: (newOrder) => setState(() => _tabOrder = newOrder),
+      ),
+    );
+  }
+
+  void _showThemeSelectorModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ThemeSelectorModal(
+        currentTheme: _currentTheme,
+        onSelectTheme: (th) => setState(() => _currentTheme = th),
+        selectedPaletteIdx: _paletteIdx,
+        onSelectPalette: (idx) => setState(() => _paletteIdx = idx),
+        isUltraPerformance: _isUltraPerformance,
+        onTogglePerformance: (val) => setState(() => _isUltraPerformance = val),
+      ),
+    );
+  }
+
+  void _showVoiceAssistantModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => VoiceAssistantModal(
+        currentTemp: _state.currentTemp,
+        targetTemp: _state.targetTemp,
+        isHeating: _state.isRelayActive,
+        onSetTarget: _onTargetChanged,
+        onToggleRelay: _onToggleRelay,
+        onNavigateToTab: (idx) {
+          // Switch tab order
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_isBooted && widget.settings.startupSplashEnabled) {
+      return StartupBootSplash(
+        onFinish: () => setState(() => _isBooted = true),
+      );
+    }
+
     if (_isCallOverlayOpen) {
       return VoiceCallOverlay(
         callReason: _callReason,
@@ -162,79 +247,79 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
 
     if (_isSmartDisplayOpen) {
+      MascotType mType = MascotType.termobot;
+      if (widget.settings.mascotType == 'flamey') mType = MascotType.flamey;
+      if (widget.settings.mascotType == 'frosty') mType = MascotType.frosty;
+
       return SmartDisplayView(
         currentTemp: _state.currentTemp,
         targetTemp: _state.targetTemp,
         isHeating: _state.isRelayActive,
+        onSetTarget: _onTargetChanged,
         onDismiss: () => setState(() => _isSmartDisplayOpen = false),
+        mascotType: mType,
       );
     }
 
-    final screens = [
-      ThermostatScreen(
-        state: _state,
-        settings: widget.settings,
-        onTargetChanged: _onTargetChanged,
-        onSetPreset: _onSetPreset,
-        onToggleRelay: _onToggleRelay,
-        onOpenSettings: _showSettingsModal,
-        onLaunchSmartDisplay: () => setState(() => _isSmartDisplayOpen = true),
-      ),
-      const WeatherScreen(),
-      const ReportsScreen(),
-      const ScheduleScreen(),
-    ];
+    if (_isScreenSaverOpen) {
+      MascotType mType = MascotType.termobot;
+      if (widget.settings.mascotType == 'flamey') mType = MascotType.flamey;
+      if (widget.settings.mascotType == 'frosty') mType = MascotType.frosty;
 
-    final titles = [
-      'TermoBot 3D',
-      'Bölgesel Hava Durumu',
-      'Tüketim Analitiği',
-      'Haftalık Program',
-    ];
+      return MascotScreenSaverOverlay(
+        isVisible: true,
+        mascotType: mType,
+        currentTemp: _state.currentTemp,
+        targetTemp: _state.targetTemp,
+        isHeating: _state.isRelayActive,
+        onDismiss: () => setState(() => _isScreenSaverOpen = false),
+      );
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(titles[_currentIndex]),
-        actions: [
-          // Ambiyans Modu Butonu
-          IconButton(
-            icon: const Icon(Icons.tv_rounded, color: Colors.white70),
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              setState(() => _isSmartDisplayOpen = true);
-            },
-          ),
-          // Ayarlar Çarkı
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Colors.white),
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              _showSettingsModal();
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
+      backgroundColor: const Color(0xFF0F0E15),
       body: Stack(
         children: [
-          IndexedStack(
-            index: _currentIndex,
-            children: screens,
+          // ── IMMERSIVE TACTILE DECK & CAROUSEL (PIXEL-IDENTICAL TO IMAGE_BC3BC9F4.PNG) ──
+          TactileDeckScreen(
+            state: _state,
+            settings: widget.settings,
+            tabOrder: _tabOrder,
+            currentTheme: _currentTheme,
+            paletteIdx: _paletteIdx,
+            onTargetChanged: _onTargetChanged,
+            onSetPreset: _onSetPreset,
+            onToggleRelay: _onToggleRelay,
+            onOpenSettings: _showSettingsModal,
+            onLaunchSmartDisplay: () => setState(() => _isSmartDisplayOpen = true),
+            onOpenCustomizer: _showCustomizerModal,
+            onOpenThemeSelector: _showThemeSelectorModal,
+            onOpenVoiceAssistant: _showVoiceAssistantModal,
+            onToggleLanguage: () {
+              HapticFeedback.lightImpact();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Dil: Türkçe (TR) Aktif'),
+                  duration: Duration(seconds: 1),
+                  backgroundColor: Color(0xFF1B1926),
+                ),
+              );
+            },
           ),
 
-          // Üst Kayan Sistem Uyarı Banner'ı
+          // ── TOP FLOATING ALERT BANNER (KOPUK BAĞLANTI / DÜŞÜK PİL) ──
           if (_alertMessage != null)
             Positioned(
-              top: 10,
-              left: 16,
-              right: 16,
+              top: MediaQuery.of(context).padding.top + 10,
+              left: 14,
+              right: 14,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: _isAlertError ? const Color(0xFFDC2626) : const Color(0xFFD97706),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: const [
-                    BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                    BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, 4)),
                   ],
                 ),
                 child: Row(
@@ -242,6 +327,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     Icon(
                       _isAlertError ? Icons.wifi_off_rounded : Icons.battery_alert_rounded,
                       color: Colors.white,
+                      size: 20,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -250,39 +336,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 18),
-                      onPressed: () => setState(() => _alertMessage = null),
+                    GestureDetector(
+                      onTap: () => setState(() => _alertMessage = null),
+                      child: const Icon(Icons.close, color: Colors.white, size: 18),
                     ),
                   ],
                 ),
               ),
             ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          HapticFeedback.selectionClick();
-          setState(() => _currentIndex = index);
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.thermostat_rounded),
-            label: 'Termostat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.wb_sunny_rounded),
-            label: 'Hava',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: 'Rapor',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.alarm_rounded),
-            label: 'Program',
-          ),
         ],
       ),
     );

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/app_settings.dart';
+import '../services/haptics_service.dart';
+import '../services/sound_synthesis_service.dart';
+import 'vault_modal.dart';
+import 'google_home_modal.dart';
+import 'esp_diagnostics_modal.dart';
 
 class SettingsSheet extends StatefulWidget {
   final AppSettings settings;
@@ -10,6 +15,7 @@ class SettingsSheet extends StatefulWidget {
   final VoidCallback onTriggerDisconnectAlert;
   final VoidCallback onTriggerLowBatteryAlert;
   final VoidCallback onResetFactorySettings;
+  final VoidCallback? onLaunchScreenSaver;
 
   const SettingsSheet({
     super.key,
@@ -20,6 +26,7 @@ class SettingsSheet extends StatefulWidget {
     required this.onTriggerDisconnectAlert,
     required this.onTriggerLowBatteryAlert,
     required this.onResetFactorySettings,
+    this.onLaunchScreenSaver,
   });
 
   @override
@@ -137,6 +144,32 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         val: _s.telegramAlertsEnabled,
                         onChanged: (v) => _save(_s.copyWith(telegramAlertsEnabled: v)),
                       ),
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF59E0B),
+                          minimumSize: const Size.fromHeight(40),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.lock_open_rounded, color: Colors.white, size: 18),
+                        label: const Text('Şifreli Kasa PIN Girişi & Test',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (ctx) => VaultModal(
+                              currentPin: _s.vaultPin,
+                              onUpdatePin: (p) => _save(_s.copyWith(vaultPin: p)),
+                              telegramToken: _s.telegramToken,
+                              telegramChatId: _s.telegramChatId,
+                              onUpdateToken: (t) => _save(_s.copyWith(telegramToken: t)),
+                              onUpdateChatId: (c) => _save(_s.copyWith(telegramChatId: c)),
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -173,6 +206,28 @@ class _SettingsSheetState extends State<SettingsSheet> {
                           '🎙️ "Hey Google, salon termostatını 22 derece yap"',
                           style: TextStyle(fontSize: 12, color: Colors.blueAccent),
                         ),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3B82F6),
+                          minimumSize: const Size.fromHeight(40),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 18),
+                        label: const Text('Matter Eşleştirme Kodunu Yönet',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (ctx) => GoogleHomeModal(
+                              isEnabled: _s.googleHomeEnabled,
+                              onToggleEnabled: (v) => _save(_s.copyWith(googleHomeEnabled: v)),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -270,35 +325,90 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   ),
                 ),
 
-                // 5. Haptik Titreşim & Dokunma
+                // 5. Haptik Titreşim & Sentetik Ses Motoru (Madde 13, 14, 15)
                 _buildSectionCard(
                   id: 'haptics',
-                  title: '5. Haptik Titreşim & Dokunma',
-                  sub: 'Kadran dönüşünde dokunsal klik geri bildirimi',
-                  icon: Icons.vibration_rounded,
+                  title: '5. Haptik & Sentetik Ses Motoru',
+                  sub: 'Mekanik kadran klikleri, röle thud vuruşu ve maskot sesleri',
+                  icon: Icons.volume_up_rounded,
                   accentColor: const Color(0xFF10B981),
                   content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildSwitch(
-                        label: 'Dokunsal Haptik Motoru',
+                        label: 'Dokunsal Haptik Titreşim Motoru',
                         val: _s.hapticsEnabled,
-                        onChanged: (v) => _save(_s.copyWith(hapticsEnabled: v)),
+                        onChanged: (v) {
+                          HapticsService.setEnabled(v);
+                          _save(_s.copyWith(hapticsEnabled: v));
+                        },
+                      ),
+                      _buildSwitch(
+                        label: 'Sentetik Mekanik Ses Efektleri (Web Audio)',
+                        val: SoundSynthesisService.isEnabled,
+                        onChanged: (v) {
+                          SoundSynthesisService.setEnabled(v);
+                          setState(() {});
+                        },
                       ),
                       const SizedBox(height: 8),
+                      const Text(
+                        'Titreşim Yoğunluğu:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: ['light', 'medium', 'heavy'].map((strength) {
                           final isSel = _s.hapticStrength == strength;
                           return ChoiceChip(
-                            label: Text(strength.toUpperCase()),
+                            label: Text(strength.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                             selected: isSel,
                             selectedColor: const Color(0xFF10B981),
                             onSelected: (val) {
-                              HapticFeedback.mediumImpact();
+                              if (strength == 'light') HapticsService.trigger(HapticFeedbackType.light, force: true);
+                              if (strength == 'medium') HapticsService.trigger(HapticFeedbackType.medium, force: true);
+                              if (strength == 'heavy') HapticsService.trigger(HapticFeedbackType.heavy, force: true);
                               _save(_s.copyWith(hapticStrength: strength));
                             },
                           );
                         }).toList(),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Canlı Ses & Titreşim Testleri:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          ActionChip(
+                            avatar: const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFFFBBF24)),
+                            label: const Text('Kadran Kliki', style: TextStyle(fontSize: 10, color: Colors.white)),
+                            backgroundColor: Colors.white.withValues(alpha: 0.08),
+                            onPressed: () => SoundSynthesisService.playDialTick(),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.flash_on_rounded, size: 14, color: Color(0xFFFF6A00)),
+                            label: const Text('Röle Ateşleme Thud', style: TextStyle(fontSize: 10, color: Colors.white)),
+                            backgroundColor: Colors.white.withValues(alpha: 0.08),
+                            onPressed: () => SoundSynthesisService.playRelayClick(isEngaged: true),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.music_note_rounded, size: 14, color: Color(0xFF38BDF8)),
+                            label: const Text('Maskot Fanfarı', style: TextStyle(fontSize: 10, color: Colors.white)),
+                            backgroundColor: Colors.white.withValues(alpha: 0.08),
+                            onPressed: () => SoundSynthesisService.playMascotSound(MascotSoundType.happy),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFFB7185)),
+                            label: const Text('İkaz Sireni', style: TextStyle(fontSize: 10, color: Colors.white)),
+                            backgroundColor: Colors.white.withValues(alpha: 0.08),
+                            onPressed: () => SoundSynthesisService.playWarningAlert(WarningSoundType.connection),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -322,10 +432,11 @@ class _SettingsSheetState extends State<SettingsSheet> {
                 _buildSectionCard(
                   id: 'mascot',
                   title: '7. Sanal Asistan & Sevimli Maskot',
-                  sub: 'Ana ekranda canlı zıplayan interaktif maskot',
+                  sub: 'Ana ekranda canlı zıplayan interaktif 3D maskot',
                   icon: Icons.smart_toy_rounded,
                   accentColor: const Color(0xFFEC4899),
                   content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildSwitch(
                         label: 'Maskotu Göster',
@@ -336,6 +447,39 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         label: 'Maskot Ses Efektleri',
                         val: _s.mascotSoundsEnabled,
                         onChanged: (v) => _save(_s.copyWith(mascotSoundsEnabled: v)),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Aktif Maskot Karakteri:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _buildMascotChoicePill('termobot', '🤖 TermoBot', const Color(0xFF38BDF8)),
+                          const SizedBox(width: 6),
+                          _buildMascotChoicePill('flamey', '🔥 Flamey', const Color(0xFFFF8C32)),
+                          const SizedBox(width: 6),
+                          _buildMascotChoicePill('frosty', '❄️ Frosty', const Color(0xFF93C5FD)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEC4899),
+                          minimumSize: const Size.fromHeight(42),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.nightlight_round, color: Colors.white, size: 18),
+                        label: const Text(
+                          'Maskot Ekran Koruyucuyu Başlat',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.5),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.pop(context);
+                          widget.onLaunchScreenSaver?.call();
+                        },
                       ),
                     ],
                   ),
@@ -383,7 +527,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                 _buildSectionCard(
                   id: 'esp_hardware',
                   title: '9. ESP32 Donanım & IP Köprüsü',
-                  sub: 'Yerel ağdaki ESP32 röle bağlantı parametreleri',
+                  sub: 'Yerel ağdaki ESP32 röle bağlantı parametreleri ve tanılaması',
                   icon: Icons.developer_board_rounded,
                   accentColor: const Color(0xFF06B6D4),
                   content: Column(
@@ -398,6 +542,32 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         label: 'İletişim Portu (Örn: 80)',
                         initialVal: _s.espPort.toString(),
                         onChanged: (v) => _save(_s.copyWith(espPort: int.tryParse(v) ?? 80)),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0891B2),
+                          minimumSize: const Size.fromHeight(42),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.troubleshoot_rounded, color: Colors.white, size: 18),
+                        label: const Text(
+                          'Donanım Tanılama & Röle Stres Testi',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.5),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EspDiagnosticsModal(
+                                espIp: _s.espIp,
+                                espPort: _s.espPort,
+                                isConnected: true,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -577,6 +747,40 @@ class _SettingsSheetState extends State<SettingsSheet> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMascotChoicePill(String id, String label, Color accent) {
+    final isSel = _s.mascotType == id;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _save(_s.copyWith(mascotType: id));
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSel ? accent.withOpacity(0.25) : const Color(0xFF0F1523),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSel ? accent : Colors.white12,
+              width: isSel ? 1.5 : 1.0,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                color: isSel ? Colors.white : Colors.white60,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

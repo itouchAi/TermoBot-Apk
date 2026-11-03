@@ -31,6 +31,7 @@ class AppSettings {
 
   // 7. Sanal Asistan & Sevimli Maskot
   bool mascotEnabled;
+  String mascotType; // 'termobot' | 'flamey' | 'frosty'
   String mascotEmotion; // 'happy' | 'warming' | 'sleepy' | 'idle'
   bool mascotSoundsEnabled;
 
@@ -74,6 +75,7 @@ class AppSettings {
     this.startupSplashEnabled = true,
     this.splashDurationMs = 2400,
     this.mascotEnabled = true,
+    this.mascotType = 'termobot',
     this.mascotEmotion = 'happy',
     this.mascotSoundsEnabled = true,
     this.voiceCallEnabled = true,
@@ -96,8 +98,8 @@ class AppSettings {
     String? telegramToken,
     String? telegramChatId,
     bool? telegramAlertsEnabled,
-    bool? googleHomeEnabled,
     String? googleHomeDeviceName,
+    bool? googleHomeEnabled,
     bool? smartDisplayEnabled,
     String? smartDisplayTheme,
     int? screensaverTimeoutSec,
@@ -110,6 +112,7 @@ class AppSettings {
     bool? startupSplashEnabled,
     int? splashDurationMs,
     bool? mascotEnabled,
+    String? mascotType,
     String? mascotEmotion,
     bool? mascotSoundsEnabled,
     bool? voiceCallEnabled,
@@ -145,6 +148,7 @@ class AppSettings {
       startupSplashEnabled: startupSplashEnabled ?? this.startupSplashEnabled,
       splashDurationMs: splashDurationMs ?? this.splashDurationMs,
       mascotEnabled: mascotEnabled ?? this.mascotEnabled,
+      mascotType: mascotType ?? this.mascotType,
       mascotEmotion: mascotEmotion ?? this.mascotEmotion,
       mascotSoundsEnabled: mascotSoundsEnabled ?? this.mascotSoundsEnabled,
       voiceCallEnabled: voiceCallEnabled ?? this.voiceCallEnabled,

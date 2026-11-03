@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/sound_synthesis_service.dart';
 
 class VoiceCallOverlay extends StatefulWidget {
   final String callReason;
@@ -31,15 +32,18 @@ class _VoiceCallOverlayState extends State<VoiceCallOverlay> {
   void initState() {
     super.initState();
     HapticFeedback.heavyImpact();
+    SoundSynthesisService.startCallRingtone();
   }
 
   @override
   void dispose() {
+    SoundSynthesisService.stopCallRingtone();
     _callTimer?.cancel();
     super.dispose();
   }
 
   void _answerCall() {
+    SoundSynthesisService.stopCallRingtone();
     HapticFeedback.mediumImpact();
     setState(() {
       _isAnswered = true;
@@ -54,6 +58,7 @@ class _VoiceCallOverlayState extends State<VoiceCallOverlay> {
   }
 
   void _endCall() {
+    SoundSynthesisService.stopCallRingtone();
     HapticFeedback.lightImpact();
     _callTimer?.cancel();
     widget.onDismiss();
