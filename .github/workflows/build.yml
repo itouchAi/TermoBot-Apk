@@ -31,14 +31,11 @@ jobs:
           rm -rf android
           flutter create . --platforms=android --org com.termobot
           flutter pub get
-          if [ -f android/app/src/main/AndroidManifest.xml ]; then
-            sed -i 's/package="[^"]*"//g' android/app/src/main/AndroidManifest.xml || true
-          fi
 
       - name: Build Release APK
         run: |
           cd flutter_termobot
-          flutter build apk --release
+          flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Flutter Release APK Artifact
         uses: actions/upload-artifact@v4
