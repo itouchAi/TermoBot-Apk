@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'audio_synthesizer_stub.dart'
-    if (dart.library.js_interop) 'audio_synthesizer_web.dart';
+    if (dart.library.html) 'audio_synthesizer_web.dart';
 import 'haptics_service.dart';
 
 enum MascotSoundType {
