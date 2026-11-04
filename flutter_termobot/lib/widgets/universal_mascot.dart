@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/sound_synthesis_service.dart';
-export 'mascot_widget.dart';
 
 enum MascotType {
   termobot,
