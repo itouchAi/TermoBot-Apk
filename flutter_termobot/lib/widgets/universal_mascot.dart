@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/sound_synthesis_service.dart';
+export 'mascot_widget.dart';
 
 enum MascotType {
   termobot,
@@ -22,8 +23,6 @@ enum MascotState {
   shivering, // < 19.5°C
   sweating,  // > 25.0°C
 }
-
-export 'mascot_widget.dart';
 
 class UniversalMascot extends StatefulWidget {
   final MascotType type;
