@@ -352,8 +352,8 @@ class _SmartDisplayViewState extends State<SmartDisplayView>
                             child: UniversalMascot(
                               currentTemp: widget.currentTemp,
                               targetTemp: widget.targetTemp,
-                              isKombiActive: widget.isHeating,
-                              forcedCharacter: widget.mascotType,
+                              isHeating: widget.isHeating,
+                              type: widget.mascotType,
                             ),
                           ),
                         ],

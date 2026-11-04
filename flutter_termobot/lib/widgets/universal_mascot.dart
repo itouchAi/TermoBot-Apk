@@ -23,6 +23,8 @@ enum MascotState {
   sweating,  // > 25.0°C
 }
 
+export 'mascot_widget.dart';
+
 class UniversalMascot extends StatefulWidget {
   final MascotType type;
   final MascotState? forcedState;
@@ -33,17 +35,20 @@ class UniversalMascot extends StatefulWidget {
   final bool interactive;
   final VoidCallback? onTap;
 
-  const UniversalMascot({
+  UniversalMascot({
     super.key,
-    this.type = MascotType.termobot,
+    MascotType? type,
+    MascotType? forcedCharacter,
     this.forcedState,
     this.currentTemp = 21.8,
     this.targetTemp = 22.5,
-    this.isHeating = false,
+    bool? isHeating,
+    bool? isKombiActive,
     this.size = 72.0,
     this.interactive = true,
     this.onTap,
-  });
+  }) : type = forcedCharacter ?? type ?? MascotType.termobot,
+       isHeating = isKombiActive ?? isHeating ?? false;
 
   @override
   State<UniversalMascot> createState() => _UniversalMascotState();

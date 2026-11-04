@@ -4,6 +4,7 @@ import '../models/thermostat_state.dart';
 import '../models/app_settings.dart';
 import '../widgets/exact_tactile_dial.dart';
 import '../widgets/universal_mascot.dart';
+import '../widgets/mascot_widget.dart';
 import '../utils/i18n.dart';
 import 'weather_screen.dart';
 import 'reports_screen.dart';
@@ -161,10 +162,11 @@ class _TactileDeckScreenState extends State<TactileDeckScreen> {
               Positioned(
                 right: 14,
                 bottom: 40,
-                child: MascotWidget(
+                child: UniversalMascot(
                   isHeating: widget.state.isRelayActive,
                   currentTemp: widget.state.currentTemp,
                   targetTemp: widget.state.targetTemp,
+                  type: _resolveMascotType(widget.settings.mascotType),
                 ),
               ),
           ],
